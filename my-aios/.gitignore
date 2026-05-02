@@ -1,0 +1,24 @@
+# my-aios — never commit these
+.env
+.env.*
+!.env.example
+
+logs/
+*.log
+
+# Live portfolio state (paper portfolio is committed for memory)
+memory/portfolio-live.md
+memory/*.live.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node (in case any routines use it)
+node_modules/
+
+# OS
+.DS_Store
