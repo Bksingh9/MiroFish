@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+config/google_oauth_client.json
+config/google_token.json
+config/*.json
+!config/.gitkeep
