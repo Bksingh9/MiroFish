@@ -25,6 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from skills.account import get_account, is_market_open  # noqa: E402
 from skills.guardrails import (  # noqa: E402
     GuardrailError,
     build_plan,
@@ -81,6 +82,36 @@ def main() -> int:
         return 0
 
     portfolio = load()
+
+    import os as _os
+    portfolio.mode = _os.getenv("TRADING_MODE", portfolio.mode)
+
+    # Refresh equity/buying power from the broker in paper/live so
+    # sizing reflects reality, not stale portfolio.md.
+    try:
+        acct = get_account()
+        portfolio.equity = acct.equity
+        portfolio.buying_power = acct.buying_power
+        if acct.trading_blocked:
+            notify(
+                "Routine 2 halted",
+                "Alpaca reports trading_blocked=True. Standing down.",
+            )
+            return 1
+    except Exception as e:  # noqa: BLE001 — never abandon
+        notify(
+            "Routine 2 — broker sync failed",
+            f"{type(e).__name__}: {e}\nFalling back to portfolio.md state.",
+        )
+
+    if not is_market_open():
+        notify(
+            f"Routine 2 — {datetime.now():%Y-%m-%d}",
+            "Market closed. No entries.",
+        )
+        print("Market closed; nothing to do.")
+        return 0
+
     open_count = len(portfolio.open_positions)
     held = {p.ticker for p in portfolio.open_positions}
     today = datetime.now().strftime("%Y-%m-%d")

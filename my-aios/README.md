@@ -20,6 +20,7 @@ max 4 positions, 10% per trade.
 | Routine 3 — Midday scan  | ✅ Done (dry-run verified) |
 | Routine 4 — End-of-day   | ✅ Done (dry-run verified) |
 | Routine 5 — Friday review| ✅ Done (dry-run verified) |
+| Alpaca tooling           | ✅ `scripts/check_alpaca.py` + `scripts/sync_portfolio.py` |
 | Alpaca connection        | ⏳ keys in `.env`, awaiting host with internet egress |
 | VPS provisioned          | 🚫 Blocker    |
 | Slack/Discord webhook    | 🚫 Blocker    |
@@ -49,15 +50,37 @@ Output:
 
 ## Going to paper
 
-1. Get Alpaca paper API keys: <https://app.alpaca.markets/paper/dashboard/overview>
-2. `pip install alpaca-py`
-3. Set `.env`:
-   ```
-   TRADING_MODE=paper
-   ALPACA_API_KEY=...
-   ALPACA_API_SECRET=...
-   ```
-4. Re-run Routine 1. It should now pull real Alpaca daily bars.
+Run these on a host with internet egress (laptop or VPS — not a
+restricted sandbox):
+
+```bash
+cd my-aios
+
+# 1. Install SDK (once)
+pip install alpaca-py
+
+# 2. Configure .env (do not commit; .env is gitignored)
+cp .env.example .env
+# Edit .env: paste Key + Secret, set TRADING_MODE=paper
+
+# 3. Validate keys + connectivity (no orders placed)
+python3 scripts/check_alpaca.py
+
+# 4. Pull real account state into portfolio.md
+python3 scripts/sync_portfolio.py
+
+# 5. Run Routine 1 in paper mode (fetches real Alpaca bars)
+python3 routines/routine_01_premarket.py
+```
+
+If `check_alpaca.py` returns "All checks passed", paper mode is
+wired correctly. From here, Routines 2–4 will:
+- pull real equity/buying-power from Alpaca for sizing
+- submit real bracket orders to the paper account
+- reconcile portfolio.md against broker state
+
+If you see `Host not in allowlist` or a network error, you're on a
+restricted host. Try from a regular dev machine or the VPS.
 
 ---
 
@@ -126,7 +149,14 @@ my-aios/
 │   ├── portfolio.md     paper portfolio
 │   └── premarket-*.md   daily scan reports (generated)
 ├── routines/
-│   └── routine_01_premarket.py
+│   ├── routine_01_premarket.py
+│   ├── routine_02_open.py
+│   ├── routine_03_midday.py
+│   ├── routine_04_eod.py
+│   └── routine_05_friday.py
+├── scripts/
+│   ├── check_alpaca.py    one-shot key + connectivity validator
+│   └── sync_portfolio.py  pull broker state into portfolio.md
 ├── templates/         ← reusable scaffolds (TODO)
 ├── clients/           ← reserved for Mode A
 └── logs/              ← run logs (gitignored)
