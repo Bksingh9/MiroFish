@@ -7,17 +7,17 @@
 
 - Mode: `dry_run`
 - Equity: $10,000.00
-- Buying power: $7,231.00
-- Last updated: 2026-05-03 12:46:43
+- Buying power: $6,475.14
+- Last updated: 2026-05-03 16:56:31
 
 ## Open positions
 
 | Ticker | Qty | Entry | Stop | Target | P&L | Opened |
 | ------ | --- | ----- | ---- | ------ | --- | ------ |
-| HD | 4 | $238.00 | $228.48 | $257.04 | — | 2026-05-03 |
-| AMZN | 4 | $208.00 | $199.68 | $224.64 | — | 2026-05-03 |
-| META | 5 | $193.00 | $185.28 | $208.44 | — | 2026-05-03 |
-| AMD | 9 | $108.00 | $103.68 | $116.64 | — | 2026-05-03 |
+| WMT | 7 | $138.94 | $133.38 | $150.06 | — | 2026-05-03 |
+| ABBV | 5 | $173.94 | $166.98 | $187.86 | — | 2026-05-03 |
+| COST | 4 | $203.94 | $195.78 | $220.26 | — | 2026-05-03 |
+| BAC | 3 | $288.94 | $277.38 | $312.06 | — | 2026-05-03 |
 
 ## Closed today
 
@@ -27,8 +27,8 @@
 
 ## Lifetime stats
 
-- Total trades: 7
+- Total trades: 4
 - Win rate: —
 - Avg R: —
-- Cumulative P&L: $+5.88
-- Paper days completed: 1 / 20 required for live
+- Cumulative P&L: $+0.00
+- Paper days completed: 0 / 20 required for live

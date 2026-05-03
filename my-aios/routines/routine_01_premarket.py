@@ -1,41 +1,38 @@
 #!/usr/bin/env python3
 """Routine 1 — Pre-market research (07:00 ET).
 
-For every ticker in the watchlist:
-  - Pull 80 days of daily closes
-  - Compute RSI(14) and SMA(50)
-  - Flag candidates where RSI < 35 AND close > SMA(50)
+For every ticker in the watchlist, run every registered strategy in
+skills/strategies.py. When multiple strategies fire on the same
+ticker, the highest-scoring one wins. Candidates are then sorted
+globally by score; the top MAX_POSITIONS go into Routine 2.
 
-Writes a ranked report to memory/premarket-YYYYMMDD.md and pings
-Slack/Discord with the top candidates.
+Output:
+  memory/premarket-YYYYMMDD.md   ranked report
+  Slack/Discord ping             top candidates summary
 
-Runs in dry-run mode by default. No orders are placed.
+Runs in dry_run by default. No orders are placed.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-# Make `skills/` importable when run from any cwd.
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from skills.data_provider import get_closes  # noqa: E402
-from skills.indicators import rsi, sma  # noqa: E402
 from skills.notify import notify  # noqa: E402
+from skills.strategies import STRATEGIES, Signal, scan  # noqa: E402
 
-RSI_THRESHOLD = 35.0
-SMA_PERIOD = 50
-RSI_PERIOD = 14
-HISTORY_DAYS = 80
+HISTORY_DAYS = 250  # enough for SMA200 + MACD
 
 
 def load_watchlist(path: Path) -> list[str]:
-    import re
-
     valid = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
     tickers: list[str] = []
     for raw in path.read_text().splitlines():
@@ -48,72 +45,63 @@ def load_watchlist(path: Path) -> list[str]:
     return tickers
 
 
-def scan(tickers: list[str]) -> list[dict]:
-    rows: list[dict] = []
+def best_per_ticker(tickers: list[str]) -> tuple[list[Signal], dict[str, str]]:
+    """Return (winning_signal_per_ticker, errors_by_ticker)."""
+    winners: list[Signal] = []
+    errors: dict[str, str] = {}
     for t in tickers:
         try:
             closes = get_closes(t, days=HISTORY_DAYS)
         except Exception as e:  # noqa: BLE001 — never abandon
-            rows.append({"ticker": t, "error": str(e)})
+            errors[t] = str(e)
             continue
-
-        last = closes[-1]
-        r = rsi(closes, RSI_PERIOD)
-        s = sma(closes, SMA_PERIOD)
-        if r is None or s is None:
-            rows.append({"ticker": t, "error": "insufficient history"})
+        sigs = scan(t, closes)
+        if not sigs:
             continue
-
-        signal = (r < RSI_THRESHOLD) and (last > s)
-        rows.append(
-            {
-                "ticker": t,
-                "close": last,
-                "rsi": round(r, 2),
-                "sma50": round(s, 2),
-                "above_sma": last > s,
-                "signal": signal,
-            }
-        )
-    return rows
+        winners.append(max(sigs, key=lambda s: s.score))
+    winners.sort(key=lambda s: s.score, reverse=True)
+    return winners, errors
 
 
-def render_report(rows: list[dict], when: datetime) -> str:
-    candidates = [r for r in rows if r.get("signal")]
-    candidates.sort(key=lambda r: r["rsi"])
-
+def render_report(
+    winners: list[Signal],
+    errors: dict[str, str],
+    total: int,
+    when: datetime,
+) -> str:
+    by_strat = Counter(s.strategy for s in winners)
     lines = [
         f"# Pre-market scan — {when:%Y-%m-%d %H:%M %Z}",
         "",
         f"Mode: `{os.getenv('TRADING_MODE', 'dry_run')}`  ",
-        f"Watchlist size: {len(rows)}  ",
-        f"Signals: **{len(candidates)}**",
-        "",
-        "## Candidates (RSI<35 and close>SMA50)",
+        f"Watchlist size: {total}  ",
+        f"Strategies registered: {len(STRATEGIES)} "
+        f"({', '.join(s.__name__ for s in STRATEGIES)})  ",
+        f"Tickers with signals: **{len(winners)}**",
         "",
     ]
-    if not candidates:
+    if by_strat:
+        lines.append("Hits by strategy: " + ", ".join(
+            f"{name}={n}" for name, n in by_strat.most_common()
+        ))
+        lines.append("")
+
+    lines += ["## Ranked candidates", ""]
+    if not winners:
         lines.append("_No candidates today._")
     else:
-        lines.append("| Rank | Ticker | Close | RSI(14) | SMA(50) |")
-        lines.append("| ---- | ------ | ----- | ------- | ------- |")
-        for i, r in enumerate(candidates, 1):
+        lines.append("| Rank | Ticker | Strategy | Score | Close | Detail |")
+        lines.append("| ---- | ------ | -------- | ----- | ----- | ------ |")
+        for i, s in enumerate(winners, 1):
             lines.append(
-                f"| {i} | {r['ticker']} | ${r['close']:.2f} | "
-                f"{r['rsi']:.2f} | ${r['sma50']:.2f} |"
+                f"| {i} | {s.ticker} | {s.strategy} | {s.score} | "
+                f"${s.close:.2f} | {s.detail} |"
             )
 
-    lines += ["", "## Full scan", "", "| Ticker | Close | RSI | SMA50 | Signal |"]
-    lines.append("| ------ | ----- | --- | ----- | ------ |")
-    for r in rows:
-        if "error" in r:
-            lines.append(f"| {r['ticker']} | — | — | — | ERROR: {r['error']} |")
-            continue
-        flag = "✅" if r["signal"] else ""
-        lines.append(
-            f"| {r['ticker']} | ${r['close']:.2f} | {r['rsi']:.2f} | "
-            f"${r['sma50']:.2f} | {flag} |"
-        )
+    if errors:
+        lines += ["", "## Errors", ""]
+        for t, err in errors.items():
+            lines.append(f"- {t}: {err}")
     lines.append("")
     return "\n".join(lines)
 
@@ -126,20 +114,19 @@ def main() -> int:
         return 2
 
     tickers = load_watchlist(watchlist_path)
-    rows = scan(tickers)
-    report = render_report(rows, when)
+    winners, errors = best_per_ticker(tickers)
+    report = render_report(winners, errors, len(tickers), when)
 
     out_path = ROOT / "memory" / f"premarket-{when:%Y%m%d}.md"
     out_path.write_text(report)
 
-    candidates = [r for r in rows if r.get("signal")]
     summary = (
-        f"{len(candidates)} candidate(s) of {len(tickers)}: "
-        + ", ".join(f"{r['ticker']}@RSI{r['rsi']:.1f}" for r in candidates[:5])
-        if candidates
+        f"{len(winners)}/{len(tickers)} hit signals across "
+        f"{len(STRATEGIES)} strategies. Top: "
+        + ", ".join(f"{s.ticker}({s.strategy[:4]}@{s.score})" for s in winners[:5])
+        if winners
         else f"No candidates today ({len(tickers)} scanned)."
     )
-
     notify(f"Pre-market scan {when:%Y-%m-%d}", summary)
     print(report)
     print(f"\nReport written to: {out_path}", file=sys.stderr)

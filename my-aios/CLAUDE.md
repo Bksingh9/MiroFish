@@ -32,13 +32,24 @@
 | Parameter        | Value                                    |
 | ---------------- | ---------------------------------------- |
 | Universe         | US equities only (no options/crypto/FX)  |
-| Entry signal     | RSI(14) < 35 **AND** price > 50-day MA   |
+| Entry signal     | Any strategy in `skills/strategies.py`   |
 | Style            | Swing (hold days, not minutes)           |
 | Stop loss        | **−4%** hard stop                        |
 | Take profit      | **+8%**                                  |
 | Max positions    | **4** concurrent                         |
 | Position sizing  | **10% of equity per trade**              |
 | Account          | **PAPER** until 20+ green paper days     |
+
+### Active strategies (sanctioned per GUARDRAILS §3)
+
+1. `mean_reversion`  — oversold bounce in uptrend
+2. `trend_pullback`  — pullback to 20DMA inside 50/200 uptrend
+3. `breakout`        — new 20-day high above 50DMA, momentum filter
+4. `macd_cross`      — bullish MACD cross above 200DMA
+
+When multiple strategies fire on the same ticker, Routine 1 picks
+the highest-scoring signal. Top 4 by score across the watchlist go
+into Routine 2 for entry.
 
 > Any deviation from this table requires updating GUARDRAILS.md first.
 

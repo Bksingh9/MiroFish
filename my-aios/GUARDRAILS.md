@@ -28,10 +28,19 @@ switch trips, alert operator.
 
 ## 3. Strategy Lock
 
-- Entry: `RSI(14) < 35 AND close > SMA(50)`. Nothing else.
-- Stop: `−4%` from fill. Hard. No discretionary widening.
-- Take profit: `+8%` from fill. Trailing stop optional only after +4%.
-- Universe: US equities, average daily volume > 500k shares,
+- **Entry**: any strategy registered in `skills/strategies.py:STRATEGIES`.
+  Operator approves additions. Each strategy must be a pure function
+  returning `Signal | None` and must include backtest results showing
+  positive expectancy on at least 6 months of bars before being added.
+  Currently sanctioned strategies:
+  1. `mean_reversion`  — RSI(14)<35 AND close > SMA(50)
+  2. `trend_pullback`  — close>SMA(200), SMA(50)>SMA(200), close near SMA(20), RSI 40-55
+  3. `breakout`        — new 20-day high, close>SMA(50), RSI 55-80
+  4. `macd_cross`      — MACD bullish cross, close>SMA(200), positive histogram
+- **Exit (universal)**: `−4%` hard stop / `+8%` take profit. No
+  discretionary widening of stops. Trailing stop optional only after
+  +4%. Same exit applies to every strategy.
+- **Universe**: US equities, average daily volume > 500k shares,
   price between $5 and $500, no penny stocks, no leveraged ETFs.
 - No options. No crypto. No FX. No shorting. No margin > 1.0x.
 

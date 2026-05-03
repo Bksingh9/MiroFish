@@ -19,31 +19,74 @@ from collections.abc import Sequence
 def _synthetic_closes(ticker: str, days: int) -> list[float]:
     """Deterministic price series seeded by ticker.
 
-    Designed so a few tickers fire the RSI<35 + price>SMA50 signal
-    while most don't — enough signal to verify the routine end-to-end.
+    Patterns live at the END of the series so indicators that read the
+    most recent N bars see the right setup. seed%5 chooses the pattern:
+
+      0 → mean reversion (35-day ramp into 15-day pullback at the end)
+      1 → breakout (slow ramp ending on a new 20-day high)
+      2 → trend pullback (long uptrend, recent 4-day dip onto 20DMA)
+      3 → MACD bullish cross (uptrend, recent dip + bounce)
+      4 → no signal (drifting cycle)
     """
     seed = sum(ord(c) for c in ticker)
     base = 50.0 + (seed % 200)
+    bucket = seed % 5
 
-    # "Buy zone" tickers: 30 flat / 35 ramp / 15 sustained decline.
-    # Tuned so RSI(14) lands ≈33 while close stays modestly above
-    # SMA(50). Verified with the indicators in skills/indicators.py.
-    if seed % 5 == 0:
-        n_flat, n_ramp, n_decline = 30, 35, 15
-        assert n_flat + n_ramp + n_decline == days
+    if bucket == 0:
+        # Mean reversion. Action at end: 35-bar ramp, 15-bar decline.
+        # Verified to land RSI≈33 and close just above SMA50.
+        action = 50
+        prefix = max(days - action, 0)
+        closes: list[float] = [round(base, 2)] * prefix
+        for i in range(35):
+            closes.append(round(base + (i + 1) * 78.0 / 35, 2))
         peak = base + 78.0
-        end_close = peak - n_decline * 2.0  # 2.0/day decline
-        closes: list[float] = [round(base, 2)] * n_flat
-        for i in range(n_ramp):
-            closes.append(round(base + (i + 1) * 78.0 / n_ramp, 2))
-        for i in range(n_decline):
+        for i in range(15):
             closes.append(round(peak - (i + 1) * 2.0, 2))
+        return closes[-days:]
+
+    if bucket == 1:
+        # Breakout. Long quiet base, 20-bar consolidation, final 1-bar
+        # poke above prior 20-day high. Light momentum keeps RSI < 75.
+        closes: list[float] = []
+        for i in range(days - 22):
+            closes.append(round(base + math.sin(i * 0.25) * 1.5, 2))
+        # Tight consolidation, 21 bars so the LAST bar can break it
+        for i in range(21):
+            closes.append(round(base + 6.0 + math.sin(i * 0.4) * 0.6, 2))
+        prior_top = max(closes[-21:])
+        closes.append(round(prior_top + 0.30, 2))
+        return closes[-days:]
+
+    if bucket == 2:
+        # Trend pullback. Long uptrend, recent 8-bar dip onto the 20DMA.
+        # Deeper dip pushes RSI into the 40-55 zone.
+        closes = []
+        for i in range(days - 8):
+            closes.append(round(base + i * 0.25 + math.sin(i * 0.05) * 0.5, 2))
+        peak = closes[-1]
+        for i in range(8):
+            closes.append(round(peak - (i + 1) * 0.45, 2))
         return closes
 
-    # Default: trending series with mild oscillation, no signal.
+    if bucket == 3:
+        # MACD bullish cross. Long uptrend, deep 12-bar dip, 4-bar
+        # sharp recovery — flips MACD above signal in the last bar.
+        closes = []
+        for i in range(days - 16):
+            closes.append(round(base + i * 0.18, 2))
+        peak = closes[-1]
+        for i in range(12):
+            closes.append(round(peak - (i + 1) * 0.55, 2))
+        bottom = closes[-1]
+        for i in range(4):
+            closes.append(round(bottom + (i + 1) * 1.4, 2))
+        return closes
+
+    # Bucket 4: drifting cycle, no signal.
     closes = []
     for i in range(days):
-        trend = i * 0.18
+        trend = i * 0.05
         cycle = math.sin((i + seed) * 0.18) * 4.0
         wobble = math.sin((i + seed) * 0.91) * 1.0
         closes.append(round(base + trend + cycle + wobble, 2))

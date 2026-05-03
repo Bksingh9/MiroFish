@@ -37,8 +37,9 @@ from skills.orders import submit_bracket  # noqa: E402
 from skills.portfolio import Position, load, save  # noqa: E402
 
 
+# Rank | Ticker | Strategy | Score | Close | Detail
 CANDIDATE_ROW = re.compile(
-    r"^\|\s*\d+\s*\|\s*([A-Z.]+)\s*\|\s*\$([\d.]+)\s*\|\s*([\d.]+)\s*\|"
+    r"^\|\s*\d+\s*\|\s*([A-Z.]+)\s*\|\s*([a-z_]+)\s*\|\s*([\d.]+)\s*\|\s*\$([\d.]+)\s*\|"
 )
 
 
@@ -47,12 +48,12 @@ def latest_premarket_report() -> Path | None:
     return reports[-1] if reports else None
 
 
-def parse_candidates(report: Path) -> list[tuple[str, float, float]]:
-    """Return [(ticker, close, rsi)] from the candidates table."""
-    out: list[tuple[str, float, float]] = []
+def parse_candidates(report: Path) -> list[tuple[str, float, str, float]]:
+    """Return [(ticker, close, strategy, score)] from the candidates table."""
+    out: list[tuple[str, float, str, float]] = []
     in_section = False
     for line in report.read_text().splitlines():
-        if line.startswith("## Candidates"):
+        if line.startswith("## Ranked candidates") or line.startswith("## Candidates"):
             in_section = True
             continue
         if in_section and line.startswith("## "):
@@ -61,7 +62,7 @@ def parse_candidates(report: Path) -> list[tuple[str, float, float]]:
             continue
         m = CANDIDATE_ROW.match(line)
         if m:
-            out.append((m.group(1), float(m.group(2)), float(m.group(3))))
+            out.append((m.group(1), float(m.group(4)), m.group(2), float(m.group(3))))
     return out
 
 
@@ -119,7 +120,7 @@ def main() -> int:
     fills: list[str] = []
     skipped: list[str] = []
 
-    for ticker, price, _rsi in candidates:
+    for ticker, price, strategy, score in candidates:
         if ticker in held:
             skipped.append(f"{ticker}: already held")
             continue
@@ -135,7 +136,7 @@ def main() -> int:
             skipped.append(f"{ticker}: {e}")
             continue
 
-        log_intent(plan, note=f"routine_02 from {report.name}")
+        log_intent(plan, note=f"{strategy}@{score} from {report.name}")
 
         try:
             fill = submit_bracket(plan)
