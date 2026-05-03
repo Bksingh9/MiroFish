@@ -82,6 +82,42 @@ wired correctly. From here, Routines 2–4 will:
 If you see `Host not in allowlist` or a network error, you're on a
 restricted host. Try from a regular dev machine or the VPS.
 
+## Backtesting
+
+Compare strategies head-to-head before promoting one for live use:
+
+```bash
+# All strategies, full watchlist, default 500 days
+python3 scripts/backtest.py
+
+# Single strategy, custom universe and window
+python3 scripts/backtest.py --strategy mean_reversion --tickers AAPL,MSFT --days 1000
+```
+
+Reads bars via the same provider used by the routines (synthetic in
+dry_run, real Alpaca in paper). Outputs:
+- summary table to stdout (ranked by expectancy in R)
+- `memory/backtest-YYYYMMDD.md` markdown report
+
+Per GUARDRAILS §3, a strategy needs **positive expectancy and ≥30
+trades** in a real backtest before it can be added to the live
+registry.
+
+## Strategies
+
+Active per GUARDRAILS §3 (see `skills/strategies.py`):
+
+| Strategy        | Setup                                                  |
+|-----------------|--------------------------------------------------------|
+| `mean_reversion`| RSI(14)<35 AND close > SMA(50)                         |
+| `trend_pullback`| 50/200 uptrend, close near SMA(20), RSI 40–55          |
+| `breakout`      | New 20-day high, close > SMA(50), RSI 55–80            |
+| `macd_cross`    | Bullish MACD cross, close > SMA(200), positive hist    |
+
+All share the universal exit (`−4%` stop / `+8%` target). Add new
+strategies by writing a `Signal | None` function and appending to
+`STRATEGIES` in `skills/strategies.py` — operator must approve.
+
 ---
 
 ## Going to live (DO NOT until §1 of GUARDRAILS.md is satisfied)
@@ -156,7 +192,8 @@ my-aios/
 │   └── routine_05_friday.py
 ├── scripts/
 │   ├── check_alpaca.py    one-shot key + connectivity validator
-│   └── sync_portfolio.py  pull broker state into portfolio.md
+│   ├── sync_portfolio.py  pull broker state into portfolio.md
+│   └── backtest.py        compare strategies on historical bars
 ├── templates/         ← reusable scaffolds (TODO)
 ├── clients/           ← reserved for Mode A
 └── logs/              ← run logs (gitignored)
