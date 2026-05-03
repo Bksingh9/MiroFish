@@ -19,8 +19,8 @@ max 4 positions, 10% per trade.
 | Routine 2 — Market open  | ✅ Done (dry-run verified) |
 | Routine 3 — Midday scan  | ✅ Done (dry-run verified) |
 | Routine 4 — End-of-day   | ✅ Done (dry-run verified) |
-| Routine 5 — Friday review| ⏳ Next       |
-| Alpaca connection        | 🚫 Blocker    |
+| Routine 5 — Friday review| ✅ Done (dry-run verified) |
+| Alpaca connection        | ⏳ keys in `.env`, awaiting host with internet egress |
 | VPS provisioned          | 🚫 Blocker    |
 | Slack/Discord webhook    | 🚫 Blocker    |
 

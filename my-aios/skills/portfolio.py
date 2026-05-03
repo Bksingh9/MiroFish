@@ -37,6 +37,17 @@ class Closed:
 
 
 @dataclass
+class HistoricalTrade:
+    date: str
+    ticker: str
+    qty: int
+    entry: float
+    exit: float
+    pnl: float
+    reason: str
+
+
+@dataclass
 class Portfolio:
     mode: str = "dry_run"
     equity: float = 10000.0
@@ -208,6 +219,34 @@ def save(p: Portfolio) -> None:
 
 
 HISTORY_PATH = ROOT / "memory" / "trade-history.md"
+
+
+def read_history() -> list[HistoricalTrade]:
+    """Parse memory/trade-history.md back into trade records."""
+    if not HISTORY_PATH.exists():
+        return []
+    trades: list[HistoricalTrade] = []
+    for line in HISTORY_PATH.read_text().splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 7 or cells[0] in ("Date", "----"):
+            continue
+        try:
+            trades.append(
+                HistoricalTrade(
+                    date=cells[0],
+                    ticker=cells[1],
+                    qty=int(cells[2]),
+                    entry=_money(cells[3]),
+                    exit=_money(cells[4]),
+                    pnl=_money(cells[5].replace("+", "")),
+                    reason=cells[6],
+                )
+            )
+        except (ValueError, IndexError):
+            continue
+    return trades
 
 
 def archive_closed(closed: list[Closed], session_date: str) -> None:
