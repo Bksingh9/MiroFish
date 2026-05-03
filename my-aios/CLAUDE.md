@@ -113,3 +113,15 @@ my-aios/
 
 When operator unblocks any item, update this section and re-run the
 relevant routine end-to-end.
+
+---
+
+## Future Considerations
+
+- **Ruflo** (<https://github.com/ruvnet/ruflo>) — multi-agent
+  orchestration for Claude Code with vector memory + swarm
+  coordination. Light-touch borrow: adopt the
+  Researcher/Builder/Tester/Deployer role pattern in routines that
+  fan out (e.g. Routine 1 if we expand the universe to 200+ tickers,
+  Routine 5 weekly review). Defer full adoption until after live
+  trading is proven.

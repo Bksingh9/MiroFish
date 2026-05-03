@@ -8,7 +8,7 @@
 - Mode: `dry_run`
 - Equity: $10,000.00
 - Buying power: $9,053.88
-- Last updated: 2026-05-03 10:37:18
+- Last updated: 2026-05-03 11:51:43
 
 ## Open positions
 
@@ -20,9 +20,7 @@
 
 | Ticker | Qty | Entry | Exit | P&L | Reason |
 | ------ | --- | ----- | ---- | --- | ------ |
-| AMZN | 4 | $208.00 | $199.68 | $-33.28 | STOP_LOSS |
-| META | 5 | $193.00 | $185.28 | $-38.60 | STOP_LOSS |
-| AMD | 9 | $108.00 | $116.64 | $+77.76 | TAKE_PROFIT |
+| _none_ |     |       |      |     |        |
 
 ## Lifetime stats
 
@@ -30,4 +28,4 @@
 - Win rate: —
 - Avg R: —
 - Cumulative P&L: $+5.88
-- Paper days completed: 0 / 20 required for live
+- Paper days completed: 1 / 20 required for live

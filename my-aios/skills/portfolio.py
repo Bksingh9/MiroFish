@@ -91,7 +91,7 @@ def load() -> Portfolio:
     m = re.search(r"-\s*Total trades:\s*(\d+)", text)
     if m:
         p.total_trades = int(m.group(1))
-    m = re.search(r"-\s*Cumulative P&L:\s*\$?(-?[\d.,]+)", text)
+    m = re.search(r"-\s*Cumulative P&L:\s*\$?\+?(-?[\d.,]+)", text)
     if m:
         try:
             p.cum_pnl = _money(m.group(1))
@@ -103,14 +103,14 @@ def load() -> Portfolio:
 
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if line.strip().startswith("## Open positions"):
-            # find first table row after header & separator
+        stripped = line.strip()
+        if stripped.startswith("## Open positions"):
             j = i + 1
             while j < len(lines) and not lines[j].lstrip().startswith("| Ticker"):
                 j += 1
             if j >= len(lines):
-                break
-            rows, _ = _parse_table(lines, j + 2)  # skip header + separator
+                continue
+            rows, _ = _parse_table(lines, j + 2)
             for r in rows:
                 if len(r) < 7 or r[0] in ("_none_", ""):
                     continue
@@ -124,7 +124,26 @@ def load() -> Portfolio:
                         opened=r[6],
                     )
                 )
-            break
+        elif stripped.startswith("## Closed today"):
+            j = i + 1
+            while j < len(lines) and not lines[j].lstrip().startswith("| Ticker"):
+                j += 1
+            if j >= len(lines):
+                continue
+            rows, _ = _parse_table(lines, j + 2)
+            for r in rows:
+                if len(r) < 6 or r[0] in ("_none_", ""):
+                    continue
+                p.closed_today.append(
+                    Closed(
+                        ticker=r[0],
+                        qty=int(r[1]),
+                        entry=_money(r[2]),
+                        exit=_money(r[3]),
+                        pnl=_money(r[4].replace("+", "")),
+                        reason=r[5],
+                    )
+                )
 
     return p
 
@@ -186,3 +205,29 @@ def save(p: Portfolio) -> None:
         "",
     ]
     PORTFOLIO_PATH.write_text("\n".join(lines))
+
+
+HISTORY_PATH = ROOT / "memory" / "trade-history.md"
+
+
+def archive_closed(closed: list[Closed], session_date: str) -> None:
+    """Append today's closed trades to memory/trade-history.md.
+
+    Creates the file with a header on first call. Each row is a single
+    closed trade so the file accumulates a permanent ledger.
+    """
+    if not closed:
+        return
+    new_file = not HISTORY_PATH.exists()
+    with HISTORY_PATH.open("a") as f:
+        if new_file:
+            f.write("# Trade History\n\n")
+            f.write("> Permanent ledger of all closed trades. Append-only.\n\n")
+            f.write("| Date | Ticker | Qty | Entry | Exit | P&L | Reason |\n")
+            f.write("| ---- | ------ | --- | ----- | ---- | --- | ------ |\n")
+        for c in closed:
+            f.write(
+                f"| {session_date} | {c.ticker} | {c.qty} | "
+                f"${c.entry:.2f} | ${c.exit:.2f} | "
+                f"${c.pnl:+.2f} | {c.reason} |\n"
+            )
