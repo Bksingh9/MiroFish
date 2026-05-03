@@ -84,3 +84,38 @@ def get_closes(ticker: str, days: int = 80) -> Sequence[float]:
     if len(closes) < days // 2:
         raise RuntimeError(f"Insufficient bars for {ticker}: got {len(closes)}")
     return closes
+
+
+def get_intraday_price(ticker: str, anchor: float) -> float:
+    """Current price for an open position.
+
+    dry_run: deterministic drift from the entry anchor designed to
+      exercise all three exit branches across a held basket — some
+      hit target (+8%+), some stop (−4%−), some sit unrealized.
+    paper/live: Alpaca latest trade.
+    """
+    mode = os.getenv("TRADING_MODE", "dry_run").lower()
+
+    if mode == "dry_run":
+        seed = sum(ord(c) for c in ticker)
+        bucket = seed % 3
+        if bucket == 0:
+            return round(anchor * 1.085, 2)  # take-profit hit
+        if bucket == 1:
+            return round(anchor * 0.955, 2)  # stop hit
+        return round(anchor * 1.018, 2)  # unrealized small gain
+
+    try:
+        from alpaca.data.historical import StockHistoricalDataClient
+        from alpaca.data.requests import StockLatestTradeRequest
+    except ImportError as e:
+        raise RuntimeError(
+            "alpaca-py not installed. `pip install alpaca-py` or run in dry_run."
+        ) from e
+
+    key = os.environ["ALPACA_API_KEY"]
+    secret = os.environ["ALPACA_API_SECRET"]
+    client = StockHistoricalDataClient(key, secret)
+    req = StockLatestTradeRequest(symbol_or_symbols=ticker)
+    trades = client.get_stock_latest_trade(req)
+    return float(trades[ticker].price)

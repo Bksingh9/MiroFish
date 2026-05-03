@@ -1,4 +1,4 @@
-"""Bracket order submission. dry_run simulates fills at the planned entry."""
+"""Bracket order submission and position close. dry_run simulates fills."""
 
 from __future__ import annotations
 
@@ -6,6 +6,14 @@ import os
 from dataclasses import dataclass
 
 from .guardrails import TradePlan
+
+
+@dataclass
+class CloseResult:
+    ticker: str
+    qty: int
+    exit_price: float
+    broker_order_id: str | None
 
 
 @dataclass
@@ -67,5 +75,47 @@ def submit_bracket(plan: TradePlan) -> Fill:
         fill_price=float(order.filled_avg_price or plan.entry),
         stop=plan.stop,
         target=plan.target,
+        broker_order_id=str(order.id),
+    )
+
+
+def close_position(ticker: str, qty: int, price: float) -> CloseResult:
+    """Market-close an open position.
+
+    dry_run: simulates a fill at the supplied price.
+    paper/live: submits a market sell on Alpaca.
+    """
+    mode = os.getenv("TRADING_MODE", "dry_run").lower()
+
+    if mode == "dry_run":
+        return CloseResult(
+            ticker=ticker, qty=qty, exit_price=price, broker_order_id=None
+        )
+
+    try:
+        from alpaca.trading.client import TradingClient
+        from alpaca.trading.enums import OrderSide, TimeInForce
+        from alpaca.trading.requests import MarketOrderRequest
+    except ImportError as e:
+        raise RuntimeError(
+            "alpaca-py not installed. `pip install alpaca-py` or run in dry_run."
+        ) from e
+
+    key = os.environ["ALPACA_API_KEY"]
+    secret = os.environ["ALPACA_API_SECRET"]
+    paper = mode == "paper"
+    client = TradingClient(key, secret, paper=paper)
+
+    req = MarketOrderRequest(
+        symbol=ticker,
+        qty=qty,
+        side=OrderSide.SELL,
+        time_in_force=TimeInForce.DAY,
+    )
+    order = client.submit_order(req)
+    return CloseResult(
+        ticker=ticker,
+        qty=qty,
+        exit_price=float(order.filled_avg_price or price),
         broker_order_id=str(order.id),
     )

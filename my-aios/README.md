@@ -17,7 +17,7 @@ max 4 positions, 10% per trade.
 | CLAUDE.md / GUARDRAILS.md| ✅ Done       |
 | Routine 1 — Pre-market   | ✅ Done (dry-run verified) |
 | Routine 2 — Market open  | ✅ Done (dry-run verified) |
-| Routine 3 — Midday scan  | ⏳ Next       |
+| Routine 3 — Midday scan  | ✅ Done (dry-run verified) |
 | Routine 4 — End-of-day   | ⏳ Pending    |
 | Routine 5 — Friday review| ⏳ Pending    |
 | Alpaca connection        | 🚫 Blocker    |
